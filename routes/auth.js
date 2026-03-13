@@ -5,6 +5,9 @@ let { RegisterValidator, handleResultValidator, ChangPasswordValidator } = requi
 let bcrypt = require('bcrypt')
 let jwt = require('jsonwebtoken')
 let { checkLogin } = require('../utils/authHandler')
+let crypto = require('crypto')
+let {sendMail} = require('../utils/senMailHandler')
+
 /* GET home page. */
 router.post('/register', RegisterValidator, handleResultValidator, async function (req, res, next) {
     let newUser = userController.CreateAnUser(
@@ -63,10 +66,38 @@ router.post("changepassword", checkLogin, ChangPasswordValidator, function (req,
 router.post("/logout", checkLogin, function (req, res, next) {
     res.cookie('token_login_tungNT', null, {
         maxAge: 0,
-        httpOnly:true,
-        secure:false
+        httpOnly: true,
+        secure: false
     })
     res.send("logout")
 })
+router.post('/forgotpassword', async function (req, res, next) {
+    let email = req.body.email;
+    let user = await userController.FindByEmail(email);
+    if (user) {
+        user.resetPasswordToken = crypto.randomBytes(32).toString('hex');
+        user.resetPasswordTokenExp = new Date(Date.now() + 10 * 60 * 1000);
+        await user.save();
+        let url = "http://localhost:3000/api/v1/auth/resetpassword/" + user.resetPasswordToken;
+        await sendMail(user.email,url);
+    }
+    res.send("check mail de biet")
+})
+router.post('/resetpassword/:token', async function (req, res, next) {
+    let { password } = req.body;
+    let token = req.params.token;
+    let user = await userController.FindByToken(token);
+    if (!user) {
+        res.status(404).send("token sai")
+    } else {
+        if (user.resetPasswordTokenExp > Date.now()) {
+            user.password = password;
+            user.resetPasswordToken = null;
+            user.resetPasswordTokenExp = null;
+            await user.save();
+        }
+    }
+})
+
 
 module.exports = router;

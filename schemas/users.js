@@ -53,7 +53,9 @@ const userSchema = new mongoose.Schema(
         isDeleted: {
             type: Boolean,
             default: false
-        }
+        },
+        resetPasswordToken: String,
+        resetPasswordTokenExp: Date
     },
     {
         timestamps: true

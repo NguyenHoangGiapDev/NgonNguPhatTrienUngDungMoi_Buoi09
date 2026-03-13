@@ -21,6 +21,18 @@ module.exports = {
             username: username,
             isDeleted: false
         })
+    }, 
+    FindByEmail: async function (email) {
+        return await userModel.findOne({
+            email: email,
+            isDeleted: false
+        })
+    },
+    FindByToken: async function (token) {
+        return await userModel.findOne({
+            resetPasswordToken: token,
+            isDeleted: false
+        })
     },
     FailLogin: async function (user) {
         user.loginCount++;
