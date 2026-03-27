@@ -1,93 +1,68 @@
-var express = require("express");
-var router = express.Router();
-let { checkLogin, CheckPermission } = require('../utils/authHandler')
-let { userCreateValidator
-    , userUpdateValidator
-    , handleResultValidator } = require('../utils/validatorHandler')
-let userController = require("../controllers/users");
+const express = require("express");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const usersController = require("../controllers/users");
 
+const router = express.Router();
 
-router.get("/", checkLogin, CheckPermission("ADMIN")
-    , async function (req, res, next) {
-        let users = await userController.GetAllUser();
-        res.send(users);
+const uploadDir = path.join(__dirname, "../uploads");
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, "users-" + uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+});
+
+router.post("/import", upload.any(), (req, res, next) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Khong tim thay file upload",
+      });
+    }
+
+    const uploadedFile = req.files.find((f) => f.fieldname.trim() === "file");
+
+    if (!uploadedFile) {
+      return res.status(400).json({
+        success: false,
+        message: "Field file khong dung",
+      });
+    }
+
+    const ext = path.extname(uploadedFile.originalname).toLowerCase();
+    if (ext !== ".csv") {
+      return res.status(400).json({
+        success: false,
+        message: "Chi chap nhan file CSV",
+      });
+    }
+
+    req.file = uploadedFile;
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
     });
-
-router.get("/:id", async function (req, res, next) {
-    try {
-        let result = await userModel
-            .find({ _id: req.params.id, isDeleted: false })
-        if (result.length > 0) {
-            res.send(result);
-        }
-        else {
-            res.status(404).send({ message: "id not found" });
-        }
-    } catch (error) {
-        res.status(404).send({ message: "id not found" });
-    }
-});
-
-router.post("/", userCreateValidator, handleResultValidator,
-    async function (req, res, next) {
-        try {
-            let newItem = userController.CreateAnUser(
-                req.body.username,
-                req.body.password, req.body.email, req.body.fullName,
-                req.body.avatarUrl, req.body.role, req.body.status, req.body.loginCount
-            )
-            await newItem.save();
-
-            // populate cho đẹp
-            let saved = await userModel
-                .findById(newItem._id)
-            res.send(saved);
-        } catch (err) {
-            res.status(400).send({ message: err.message });
-        }
-    });
-
-router.put("/:id", userUpdateValidator, handleResultValidator, async function (req, res, next) {
-    try {
-        let id = req.params.id;
-        //c1
-        let updatedItem = await
-            userModel.findByIdAndUpdate(id, req.body, { new: true });
-
-        if (!updatedItem)
-            return res.status(404).send({ message: "id not found" });
-        //c2
-        // let updatedItem = await userModel.findById(id);
-        // if (updatedItem) {
-        //     let keys = Object.keys(req.body);
-        //     for (const key of keys) {
-        //         getUser[key] = req.body[key]
-        //     }
-        // }
-        // await updatedItem.save()
-        let populated = await userModel
-            .findById(updatedItem._id)
-        res.send(populated);
-    } catch (err) {
-        res.status(400).send({ message: err.message });
-    }
-});
-
-router.delete("/:id", async function (req, res, next) {
-    try {
-        let id = req.params.id;
-        let updatedItem = await userModel.findByIdAndUpdate(
-            id,
-            { isDeleted: true },
-            { new: true }
-        );
-        if (!updatedItem) {
-            return res.status(404).send({ message: "id not found" });
-        }
-        res.send(updatedItem);
-    } catch (err) {
-        res.status(400).send({ message: err.message });
-    }
-});
+  }
+}, usersController.importUsersFromCsv);
 
 module.exports = router;
