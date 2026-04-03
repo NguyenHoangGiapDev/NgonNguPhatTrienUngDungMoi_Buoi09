@@ -21,6 +21,22 @@ const userSchema = new mongoose.Schema(
       required: [true, "Password là bắt buộc"],
       minlength: [6, "Password phải có ít nhất 6 ký tự"],
     },
+    failedLoginAttempts: {
+      type: Number,
+      default: 0,
+    },
+    lockTime: {
+      type: Date,
+      default: null,
+    },
+    resetPasswordToken: {
+      type: String,
+      default: null,
+    },
+    resetPasswordTokenExp: {
+      type: Date,
+      default: null,
+    },
     role: {
       type: String,
       enum: ["user", "admin"],
